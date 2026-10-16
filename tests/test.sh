@@ -31,6 +31,16 @@ assert_contains() {
     fi
 }
 
+# End-of-line anchored so "prlimit" does not spuriously match "prlimit64".
+assert_export() {
+    local sym="$1"
+    if nm -D "$LIB" 2>/dev/null | grep -qE "[[:space:]]${sym}\$"; then
+        ok "exports ${sym}"
+    else
+        fail "exports ${sym} (not found in nm -D)"
+    fi
+}
+
 summary() {
     echo ""
     echo "════════════════════════════════════"
@@ -57,9 +67,10 @@ section "Library structure"
 _type=$(file "$LIB" 2>/dev/null || true)
 assert_contains "is a shared object" "shared object" "$_type"
 
-_syms=$(nm -D "$LIB" 2>/dev/null || true)
-assert_contains "exports prlimit64" "prlimit64" "$_syms"
-assert_contains "exports setrlimit" "setrlimit" "$_syms"
+assert_export "prlimit"
+assert_export "prlimit64"
+assert_export "setrlimit"
+assert_export "setrlimit64"
 
 _rc=0
 LD_PRELOAD="$LIB" /bin/true 2>/dev/null || _rc=$?
@@ -71,18 +82,35 @@ assert_eq "loads via LD_PRELOAD" "0" "$_rc"
 section "RLIMIT_AS interception"
 
 cat > "${TESTDIR}/test_shim.c" << 'EOF'
+#define _GNU_SOURCE
+#include <stddef.h>
 #include <sys/resource.h>
 
 int main(void) {
     struct rlimit rl = { .rlim_cur = 1024, .rlim_max = 1024 };
-    if (setrlimit(RLIMIT_AS, &rl) != 0) return 1;
-
+    struct rlimit64 rl64 = { .rlim_cur = 1024, .rlim_max = 1024 };
     struct rlimit check;
+    struct rlimit old;
+
+    if (setrlimit(RLIMIT_AS, &rl) != 0) return 1;
+    if (setrlimit64(RLIMIT_AS, &rl64) != 0) return 4;
+    if (prlimit(0, RLIMIT_AS, &rl, NULL) != 0) return 5;
+    if (prlimit64(0, RLIMIT_AS, &rl64, NULL) != 0) return 6;
+
     getrlimit(RLIMIT_AS, &check);
     if (check.rlim_cur == 1024) return 2;
 
-    struct rlimit rl2 = { .rlim_cur = 512, .rlim_max = 512 };
-    if (setrlimit(RLIMIT_NOFILE, &rl2) != 0) return 3;
+    if (prlimit(0, RLIMIT_AS, &rl, &old) != 0) return 7;
+    if (old.rlim_cur == 1024) return 8;
+
+    struct rlimit rl_no = { .rlim_cur = 512, .rlim_max = 512 };
+    struct rlimit64 rl64_no = { .rlim_cur = 512, .rlim_max = 512 };
+    if (setrlimit(RLIMIT_NOFILE, &rl_no) != 0) return 3;
+    if (setrlimit64(RLIMIT_NOFILE, &rl64_no) != 0) return 9;
+    getrlimit(RLIMIT_NOFILE, &check);
+    if (check.rlim_cur != 512) return 10;
+    if (prlimit(0, RLIMIT_NOFILE, &rl_no, NULL) != 0) return 11;
+    if (prlimit64(0, RLIMIT_NOFILE, &rl64_no, NULL) != 0) return 12;
 
     return 0;
 }
@@ -94,11 +122,20 @@ _rc=0
 LD_PRELOAD="$(realpath "$LIB")" "${TESTDIR}/test_shim" >/dev/null 2>&1 || _rc=$?
 
 case $_rc in
-    0) ok   "RLIMIT_AS blocked, RLIMIT_NOFILE passed through" ;;
-    1) fail "setrlimit(RLIMIT_AS) not intercepted (rc=1)" ;;
-    2) fail "RLIMIT_AS was applied despite shim (rc=2)" ;;
-    3) fail "RLIMIT_NOFILE passthrough broken (rc=3)" ;;
-    *) fail "shim test crashed (rc=$_rc)" ;;
+    0)  ok   "RLIMIT_AS blocked on all entry points, other resources passed through" ;;
+    1)  fail "setrlimit(RLIMIT_AS) not intercepted (rc=1)" ;;
+    2)  fail "RLIMIT_AS was applied despite shim (rc=2)" ;;
+    3)  fail "RLIMIT_NOFILE passthrough broken via setrlimit (rc=3)" ;;
+    4)  fail "setrlimit64(RLIMIT_AS) not intercepted (rc=4)" ;;
+    5)  fail "prlimit(RLIMIT_AS) not intercepted (rc=5)" ;;
+    6)  fail "prlimit64(RLIMIT_AS) not intercepted (rc=6)" ;;
+    7)  fail "prlimit(RLIMIT_AS, old_limit) call failed (rc=7)" ;;
+    8)  fail "prlimit(RLIMIT_AS, old_limit) did not report real limit (rc=8)" ;;
+    9)  fail "RLIMIT_NOFILE passthrough broken via setrlimit64 (rc=9)" ;;
+    10) fail "RLIMIT_NOFILE not applied via setrlimit64 (rc=10)" ;;
+    11) fail "RLIMIT_NOFILE passthrough broken via prlimit (rc=11)" ;;
+    12) fail "RLIMIT_NOFILE passthrough broken via prlimit64 (rc=12)" ;;
+    *)  fail "shim test crashed (rc=$_rc)" ;;
 esac
 
 
@@ -106,10 +143,10 @@ esac
 
 section "Sanity (without shim)"
 
-# The shim may be loaded globally via /etc/ld.so.preload, so libc
-# wrappers (setrlimit, prlimit64) are intercepted even here.
-# Use syscall(SYS_prlimit64, ...) directly — goes straight to the
-# kernel, bypassing any LD_PRELOAD symbol interposition.
+# The shim may be loaded globally via /etc/ld.so.preload, so libc wrappers
+# (setrlimit, setrlimit64, prlimit, prlimit64) are intercepted even here.
+# Use syscall(SYS_prlimit64, ...) directly — goes straight to the kernel,
+# bypassing any LD_PRELOAD symbol interposition.
 cat > "${TESTDIR}/test_no_shim.c" << 'EOF'
 #include <unistd.h>
 #include <sys/syscall.h>

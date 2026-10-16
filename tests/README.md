@@ -4,7 +4,7 @@
 
 | File | Language | Framework | What it tests |
 |------|----------|-----------|---------------|
-| `tests/test.sh` | Bash + C (compiled inline) | Custom assertions | Library structure (shared object type, exported symbols `prlimit64`/`setrlimit`, LD_PRELOAD loadability), RLIMIT_AS interception (setrlimit blocked, getrlimit reflects no change, RLIMIT_NOFILE passthrough), sanity without shim (raw `SYS_prlimit64` syscall applies normally bypassing any LD_PRELOAD interposition) |
+| `tests/test.sh` | Bash + C (compiled inline) | Custom assertions | Library structure (shared object type, exported symbols `prlimit`/`prlimit64`/`setrlimit`/`setrlimit64`, LD_PRELOAD loadability), RLIMIT_AS interception (all four entry points blocked, getrlimit reflects no change, RLIMIT_NOFILE passthrough), sanity without shim (raw `SYS_prlimit64` syscall applies normally bypassing any LD_PRELOAD interposition) |
 
 ## Running
 
@@ -38,18 +38,19 @@ The script checks that `./libfake_rlimit.so` exists, then creates a temporary di
 Validates the built shared object without executing application logic:
 
 - **File type**: uses `file` to confirm the output is a shared object (ELF shared library)
-- **Exported symbols**: uses `nm -D` to verify that `prlimit64` and `setrlimit` are exported — these are the libc functions the shim interposes
+- **Exported symbols**: uses `nm -D` to verify that `prlimit`, `prlimit64`, `setrlimit` and `setrlimit64` are exported — these are the libc functions the shim interposes
 - **LD_PRELOAD loading**: runs `/bin/true` with `LD_PRELOAD=./libfake_rlimit.so` to confirm the library loads without errors (no missing symbols, no constructor crashes)
 
 ### RLIMIT_AS interception
 
 Compiles and runs an inline C program (`test_shim.c`) under `LD_PRELOAD` that:
 
-1. Calls `setrlimit(RLIMIT_AS, ...)` with a 1024-byte limit — should return success (intercepted, silently ignored)
-2. Calls `getrlimit(RLIMIT_AS, ...)` — the limit should **not** be 1024 (confirming the shim blocked the actual syscall)
-3. Calls `setrlimit(RLIMIT_NOFILE, ...)` — should succeed and actually apply (passthrough for non-`RLIMIT_AS` resources)
+1. Calls `setrlimit`, `setrlimit64`, `prlimit` and `prlimit64` with `RLIMIT_AS` — each should return success (intercepted, silently ignored)
+2. Calls `getrlimit(RLIMIT_AS, ...)` — the limit should **not** be applied (confirming the shim blocked the actual syscall)
+3. Calls `prlimit(RLIMIT_AS, ...)` with a non-null `old_limit` — the reported value should be the real (unchanged) limit
+4. Calls `setrlimit`, `setrlimit64`, `prlimit` and `prlimit64` with `RLIMIT_NOFILE` — should succeed and actually apply (passthrough for non-`RLIMIT_AS` resources)
 
-The test uses distinct exit codes (1–3) to pinpoint which step failed.
+The test uses distinct exit codes to pinpoint which step failed.
 
 ### Sanity without shim
 
