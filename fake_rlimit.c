@@ -23,7 +23,7 @@ static void write_str(const char *s) {
 
 /* memcpy because ISO C forbids casting dlsym's void* to a function pointer; a
  * missing symbol is fatal, so bail out rather than call through NULL. */
-static void resolve_next(const char *symbol, void *out, size_t out_size) {
+static void resolve_next(const char *symbol, void *out) {
     void *fn = dlsym(RTLD_NEXT, symbol);
     if (fn == NULL) {
         write_str("libfake_rlimit: cannot resolve ");
@@ -31,7 +31,7 @@ static void resolve_next(const char *symbol, void *out, size_t out_size) {
         write_str("\n");
         abort();
     }
-    memcpy(out, &fn, out_size < sizeof(fn) ? out_size : sizeof(fn));
+    memcpy(out, &fn, sizeof(fn));
 }
 
 /* Resolved lazily and published atomically; racing threads only ever store the
@@ -40,7 +40,7 @@ static prlimit64_fn get_real_prlimit64(void) {
     static prlimit64_fn real;
     prlimit64_fn fn = __atomic_load_n(&real, __ATOMIC_ACQUIRE);
     if (fn == NULL) {
-        resolve_next("prlimit64", &fn, sizeof(fn));
+        resolve_next("prlimit64", &fn);
         __atomic_store_n(&real, fn, __ATOMIC_RELEASE);
     }
     return fn;
@@ -50,7 +50,7 @@ static prlimit_fn get_real_prlimit(void) {
     static prlimit_fn real;
     prlimit_fn fn = __atomic_load_n(&real, __ATOMIC_ACQUIRE);
     if (fn == NULL) {
-        resolve_next("prlimit", &fn, sizeof(fn));
+        resolve_next("prlimit", &fn);
         __atomic_store_n(&real, fn, __ATOMIC_RELEASE);
     }
     return fn;
@@ -60,7 +60,7 @@ static setrlimit_fn get_real_setrlimit(void) {
     static setrlimit_fn real;
     setrlimit_fn fn = __atomic_load_n(&real, __ATOMIC_ACQUIRE);
     if (fn == NULL) {
-        resolve_next("setrlimit", &fn, sizeof(fn));
+        resolve_next("setrlimit", &fn);
         __atomic_store_n(&real, fn, __ATOMIC_RELEASE);
     }
     return fn;
@@ -70,7 +70,7 @@ static setrlimit64_fn get_real_setrlimit64(void) {
     static setrlimit64_fn real;
     setrlimit64_fn fn = __atomic_load_n(&real, __ATOMIC_ACQUIRE);
     if (fn == NULL) {
-        resolve_next("setrlimit64", &fn, sizeof(fn));
+        resolve_next("setrlimit64", &fn);
         __atomic_store_n(&real, fn, __ATOMIC_RELEASE);
     }
     return fn;
