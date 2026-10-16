@@ -14,13 +14,13 @@ Builds both variants from source, plus a `libfake_rlimit.so` shim for GTK4/glyci
 |------|---------|
 | `/usr/lib/libhardened_malloc.so` | Default variant — full hardening, for per-app use via bwrap `LD_PRELOAD` |
 | `/usr/lib/libhardened_malloc-light.so` | Light variant — balanced, loaded system-wide via `/etc/ld.so.preload` |
-| `/usr/lib/libfake_rlimit.so` | Intercepts `prlimit64`/`setrlimit` `RLIMIT_AS` calls to prevent crashes |
+| `/usr/lib/libfake_rlimit.so` | Intercepts `prlimit`/`prlimit64`/`setrlimit`/`setrlimit64` `RLIMIT_AS` calls to prevent crashes |
 | `/etc/ld.so.preload` | Preloads `libfake_rlimit.so` + `libhardened_malloc-light.so` globally |
 | `/etc/sysctl.d/20-hardened-malloc.conf` | `vm.max_map_count = 1048576` for guard slabs |
 
 ## Why fake\_rlimit
 
-GTK4 uses [glycin](https://gitlab.gnome.org/GNOME/glycin) for image loading, which sets `RLIMIT_AS` on its sandboxed loader processes. This is incompatible with hardened\_malloc's large virtual memory reservation (~240 GB `PROT_NONE` guard regions). The shim intercepts `prlimit64(RLIMIT_AS)` and `setrlimit(RLIMIT_AS)` calls, returning success without applying the limit. All other resource limits are passed through unchanged.
+GTK4 uses [glycin](https://gitlab.gnome.org/GNOME/glycin) for image loading, which sets `RLIMIT_AS` on its sandboxed loader processes. This is incompatible with hardened\_malloc's large virtual memory reservation (~240 GB `PROT_NONE` guard regions). The shim intercepts the `prlimit`, `prlimit64`, `setrlimit` and `setrlimit64` `RLIMIT_AS` calls, returning success without applying the limit. All other resource limits are passed through unchanged.
 
 ## Compatibility
 
