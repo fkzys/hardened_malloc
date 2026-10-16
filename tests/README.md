@@ -9,10 +9,11 @@
 ## Running
 
 ```bash
-# Build first (compiles hardened_malloc + libfake_rlimit.so)
-make build
+# Build just the shim and run its tests
+make test
 
-# Run tests
+# Or build everything (hardened_malloc + libfake_rlimit.so), then run
+make build
 bash tests/test.sh
 
 # With tracing

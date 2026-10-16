@@ -16,15 +16,19 @@ typedef int (*prlimit_fn)(__pid_t, enum __rlimit_resource,
 typedef int (*setrlimit_fn)(__rlimit_resource_t, const struct rlimit *);
 typedef int (*setrlimit64_fn)(__rlimit_resource_t, const struct rlimit64 *);
 
+static void write_str(const char *s) {
+    ssize_t n = write(STDERR_FILENO, s, strlen(s));
+    (void)n;
+}
+
 /* memcpy because ISO C forbids casting dlsym's void* to a function pointer; a
  * missing symbol is fatal, so bail out rather than call through NULL. */
 static void resolve_next(const char *symbol, void *out, size_t out_size) {
     void *fn = dlsym(RTLD_NEXT, symbol);
     if (fn == NULL) {
-        static const char prefix[] = "libfake_rlimit: cannot resolve ";
-        write(STDERR_FILENO, prefix, sizeof(prefix) - 1);
-        write(STDERR_FILENO, symbol, strlen(symbol));
-        write(STDERR_FILENO, "\n", 1);
+        write_str("libfake_rlimit: cannot resolve ");
+        write_str(symbol);
+        write_str("\n");
         abort();
     }
     memcpy(out, &fn, out_size < sizeof(fn) ? out_size : sizeof(fn));

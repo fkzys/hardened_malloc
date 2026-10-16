@@ -6,14 +6,19 @@ PREFIX     := /usr
 SYSCONFDIR := /etc
 SRCDIR     := hardened_malloc
 
-.PHONY: build check-upstream install uninstall clean
+.PHONY: build test check-upstream install uninstall clean
 
-build:
+build: libfake_rlimit.so
 	git clone --depth 1 --branch $(TAG) \
 		https://github.com/GrapheneOS/hardened_malloc.git $(SRCDIR)
 	$(MAKE) -C $(SRCDIR) -j$(NPROC)
 	$(MAKE) -C $(SRCDIR) -j$(NPROC) VARIANT=light
-	gcc -shared -fPIC -O2 -o libfake_rlimit.so fake_rlimit.c -ldl
+
+test: libfake_rlimit.so
+	bash tests/test.sh
+
+libfake_rlimit.so: fake_rlimit.c
+	gcc -shared -fPIC -O2 -Wall -Wextra -Werror -o $@ $< -ldl
 
 check-upstream:
 	@git ls-remote --tags $(UPSTREAM) \
