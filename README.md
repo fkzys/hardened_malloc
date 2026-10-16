@@ -14,6 +14,7 @@ Builds both variants from source, plus a `libfake_rlimit.so` shim for GTK4/glyci
 |------|---------|
 | `/usr/lib/libhardened_malloc.so` | Default variant — full hardening, for per-app use via bwrap `LD_PRELOAD` |
 | `/usr/lib/libhardened_malloc-light.so` | Light variant — balanced, loaded system-wide via `/etc/ld.so.preload` |
+| `/usr/lib/libhardened_malloc.so.empty` | Valid but empty ELF — bind-mount over the allocator to disable it in a sandbox (see [Disabling the allocator in a sandbox](#disabling-the-allocator-in-a-sandbox)) |
 | `/usr/lib/libfake_rlimit.so` | Intercepts `prlimit`/`prlimit64`/`setrlimit`/`setrlimit64` `RLIMIT_AS` calls to prevent crashes |
 | `/etc/ld.so.preload` | Preloads `libfake_rlimit.so` + `libhardened_malloc-light.so` globally |
 | `/etc/sysctl.d/20-hardened-malloc.conf` | `vm.max_map_count = 1048576` for guard slabs |
@@ -26,7 +27,7 @@ GTK4 uses [glycin](https://gitlab.gnome.org/GNOME/glycin) for image loading, whi
 
 The light variant provides zero-on-free, slab canaries, and guard slabs. The default variant adds slot randomization, write-after-free checks, and slab quarantines.
 
-Applications with custom allocators (Chromium/PartitionAlloc, Firefox/mozjemalloc) are incompatible and must have hardened\_malloc disabled in their bwrap wrappers via `--ro-bind /dev/null /etc/ld.so.preload`. See [dotfiles](https://github.com/fkzys/dotfiles) for per-app configuration.
+Applications with custom allocators (Chromium/PartitionAlloc, Firefox/mozjemalloc) are incompatible and must have hardened\_malloc disabled in their bwrap wrappers — see [Disabling the allocator in a sandbox](#disabling-the-allocator-in-a-sandbox). See [dotfiles](https://github.com/fkzys/dotfiles) for per-app configuration.
 
 To use the default (stricter) variant system-wide instead of light, edit `/etc/ld.so.preload`:
 
@@ -34,6 +35,21 @@ To use the default (stricter) variant system-wide instead of light, edit `/etc/l
 /usr/lib/libfake_rlimit.so
 /usr/lib/libhardened_malloc.so
 ```
+
+## Disabling the allocator in a sandbox
+
+Because hardened\_malloc is preloaded system-wide through `/etc/ld.so.preload`, an application that ships its own allocator can only opt out after the fact. Bind-mount the installed stub over the preloaded library:
+
+```sh
+bwrap \
+  --ro-bind /usr/lib/libhardened_malloc.so.empty /usr/lib/libhardened_malloc-light.so \
+  ...sandbox args... \
+  -- command
+```
+
+`libhardened_malloc.so.empty` is a valid but empty shared object: `ld.so` loads it successfully and it does nothing, so the allocator is neutralised while `/etc/ld.so.preload` and `libfake_rlimit.so` stay in place.
+
+This is deliberately not done with `/dev/null` because of "ERROR: ld.so: object '/usr/lib/libhardened_malloc-light.so' from /etc/ld.so.preload cannot be preloaded (cannot open shared object file): ignored." spam and because replacing full `ld.so.preload` is too invasive.
 
 ## Install
 

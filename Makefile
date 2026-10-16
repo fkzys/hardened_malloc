@@ -8,7 +8,7 @@ SRCDIR     := hardened_malloc
 
 .PHONY: build test check-upstream install uninstall clean
 
-build: libfake_rlimit.so
+build: libfake_rlimit.so libhardened_malloc.so.empty
 	git clone --depth 1 --branch $(TAG) \
 		https://github.com/GrapheneOS/hardened_malloc.git $(SRCDIR)
 	$(MAKE) -C $(SRCDIR) -j$(NPROC)
@@ -19,6 +19,9 @@ test: libfake_rlimit.so
 
 libfake_rlimit.so: fake_rlimit.c
 	gcc -shared -fPIC -O2 -Wall -Wextra -Werror -o $@ $< -ldl
+
+libhardened_malloc.so.empty:
+	gcc -shared -fPIC -o libhardened_malloc.so.empty -xc /dev/null
 
 check-upstream:
 	@git ls-remote --tags $(UPSTREAM) \
@@ -33,6 +36,8 @@ install:
 		$(DESTDIR)$(PREFIX)/lib/libhardened_malloc-light.so
 	install -Dm644 libfake_rlimit.so \
 		$(DESTDIR)$(PREFIX)/lib/libfake_rlimit.so
+	install -Dm644 libhardened_malloc.so.empty \
+		$(DESTDIR)$(PREFIX)/lib/libhardened_malloc.so.empty
 	install -Dm644 ld.so.preload \
 		$(DESTDIR)$(SYSCONFDIR)/ld.so.preload
 	install -Dm644 sysctl.d/20-hardened-malloc.conf \
@@ -43,10 +48,11 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/lib/libhardened_malloc.so
 	rm -f $(DESTDIR)$(PREFIX)/lib/libhardened_malloc-light.so
 	rm -f $(DESTDIR)$(PREFIX)/lib/libfake_rlimit.so
+	rm -f $(DESTDIR)$(PREFIX)/lib/libhardened_malloc.so.empty
 	rm -f $(DESTDIR)$(SYSCONFDIR)/ld.so.preload
 	rm -f $(DESTDIR)$(SYSCONFDIR)/sysctl.d/20-hardened-malloc.conf
 	rm -rf $(DESTDIR)$(PREFIX)/share/licenses/hardened_malloc/
 	@echo "Note: run 'sysctl --system' to reload defaults."
 
 clean:
-	rm -rf $(SRCDIR) libfake_rlimit.so
+	rm -rf $(SRCDIR) libfake_rlimit.so libhardened_malloc.so.empty
