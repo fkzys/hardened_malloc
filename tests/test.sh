@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# tests/test.sh — Unit tests for libfake_rlimit.so
+# Unit tests for libfake_rlimit.so
 # Run from project root: bash tests/test.sh
+#
+# Copyright (C) 2026 fkzys <fkzys@proton.me>
+#                    https://github.com/fkzys/hardened_malloc
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set -uo pipefail
 
