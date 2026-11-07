@@ -1,4 +1,4 @@
-TAG        := 2026100600
+TAG        := 2026110200
 UPSTREAM   := https://github.com/GrapheneOS/hardened_malloc.git
 NPROC      := $(shell nproc)
 DESTDIR    ?=
