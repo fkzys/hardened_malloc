@@ -101,4 +101,4 @@ make clean && make build && sudo make install
 
 ## License
 
-AGPL-3.0-or-later
+hardened_malloc is under MIT and anything else in this repo is under AGPL-3.0-or-later

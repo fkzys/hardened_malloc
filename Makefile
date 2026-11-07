@@ -43,6 +43,7 @@ install:
 	install -Dm644 sysctl.d/20-hardened-malloc.conf \
 		$(DESTDIR)$(SYSCONFDIR)/sysctl.d/20-hardened-malloc.conf
 	install -Dm644 LICENSE $(DESTDIR)$(PREFIX)/share/licenses/hardened_malloc/LICENSE
+	install -Dm644 LICENSE-MIT $(DESTDIR)$(PREFIX)/share/licenses/hardened_malloc/LICENSE-MIT
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/lib/libhardened_malloc.so
