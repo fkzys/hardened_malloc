@@ -38,8 +38,12 @@ install:
 		$(DESTDIR)$(PREFIX)/lib/libfake_rlimit.so
 	install -Dm644 libhardened_malloc.so.empty \
 		$(DESTDIR)$(PREFIX)/lib/libhardened_malloc.so.empty
-	install -Dm644 ld.so.preload \
-		$(DESTDIR)$(SYSCONFDIR)/ld.so.preload
+	@if [ ! -f "$(DESTDIR)$(SYSCONFDIR)/ld.so.preload" ]; then \
+		install -Dm644 ld.so.preload "$(DESTDIR)$(SYSCONFDIR)/ld.so.preload"; \
+		echo "Installed ld.so.preload"; \
+	else \
+		echo "ld.so.preload exists, skipping (check ld.so.preload in repo to adapt)"; \
+	fi
 	install -Dm644 sysctl.d/20-hardened-malloc.conf \
 		$(DESTDIR)$(SYSCONFDIR)/sysctl.d/20-hardened-malloc.conf
 	install -Dm644 LICENSE $(DESTDIR)$(PREFIX)/share/licenses/hardened_malloc/LICENSE
